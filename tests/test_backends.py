@@ -9,25 +9,25 @@ import time
 
 import pytest
 
-from llmeter.backends import get_backend, resolve_url
+from tokenly.backends import get_backend, resolve_url
 
 
 def test_resolve_url_default_is_sqlite(monkeypatch):
-    monkeypatch.delenv("LLMETER_DB_URL", raising=False)
-    monkeypatch.delenv("LLMETER_DB", raising=False)
+    monkeypatch.delenv("TOKENLY_DB_URL", raising=False)
+    monkeypatch.delenv("TOKENLY_DB", raising=False)
     url = resolve_url()
     assert url.startswith("sqlite://")
 
 
 def test_resolve_url_kwarg_wins(monkeypatch):
-    monkeypatch.setenv("LLMETER_DB_URL", "sqlite:///env.db")
+    monkeypatch.setenv("TOKENLY_DB_URL", "sqlite:///env.db")
     url = resolve_url(db_url="postgresql://u:p@h/d")
     assert url == "postgresql://u:p@h/d"
 
 
 def test_resolve_url_legacy_db_env(monkeypatch, tmp_path):
-    monkeypatch.delenv("LLMETER_DB_URL", raising=False)
-    monkeypatch.setenv("LLMETER_DB", str(tmp_path / "legacy.db"))
+    monkeypatch.delenv("TOKENLY_DB_URL", raising=False)
+    monkeypatch.setenv("TOKENLY_DB", str(tmp_path / "legacy.db"))
     url = resolve_url()
     assert url.startswith("sqlite:///")
     assert "legacy.db" in url
@@ -124,33 +124,33 @@ def test_reset_clears_calls(tmp_path):
 
 
 def test_mysql_backend_missing_driver_is_clear(monkeypatch):
-    from llmeter.backends.mysql import MysqlBackend
+    from tokenly.backends.mysql import MysqlBackend
 
     b = MysqlBackend("mysql://u:p@h/d")
     # Force pymysql import to fail.
     import sys
 
     monkeypatch.setitem(sys.modules, "pymysql", None)
-    with pytest.raises(RuntimeError, match="pip install llmeter\\[mysql\\]"):
+    with pytest.raises(RuntimeError, match="pip install tokenly\\[mysql\\]"):
         _ = b.conn
 
 
 def test_postgres_backend_missing_driver_is_clear(monkeypatch):
-    from llmeter.backends.postgres import PostgresBackend
+    from tokenly.backends.postgres import PostgresBackend
 
     b = PostgresBackend("postgresql://u:p@h/d")
     import sys
 
     monkeypatch.setitem(sys.modules, "psycopg", None)
-    with pytest.raises(RuntimeError, match="pip install llmeter\\[postgres\\]"):
+    with pytest.raises(RuntimeError, match="pip install tokenly\\[postgres\\]"):
         _ = b.conn
 
 
 def test_real_postgres_backend_if_available():
-    """Opt-in: set LLMETER_TEST_POSTGRES_URL to run against a live db."""
-    url = os.environ.get("LLMETER_TEST_POSTGRES_URL")
+    """Opt-in: set TOKENLY_TEST_POSTGRES_URL to run against a live db."""
+    url = os.environ.get("TOKENLY_TEST_POSTGRES_URL")
     if not url:
-        pytest.skip("LLMETER_TEST_POSTGRES_URL not set")
+        pytest.skip("TOKENLY_TEST_POSTGRES_URL not set")
     b = get_backend(url)
     try:
         b.write_row(
@@ -162,10 +162,10 @@ def test_real_postgres_backend_if_available():
 
 
 def test_real_mysql_backend_if_available():
-    """Opt-in: set LLMETER_TEST_MYSQL_URL to run against a live db."""
-    url = os.environ.get("LLMETER_TEST_MYSQL_URL")
+    """Opt-in: set TOKENLY_TEST_MYSQL_URL to run against a live db."""
+    url = os.environ.get("TOKENLY_TEST_MYSQL_URL")
     if not url:
-        pytest.skip("LLMETER_TEST_MYSQL_URL not set")
+        pytest.skip("TOKENLY_TEST_MYSQL_URL not set")
     b = get_backend(url)
     try:
         b.write_row(

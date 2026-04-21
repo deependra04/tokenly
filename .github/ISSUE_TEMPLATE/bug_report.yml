@@ -1,5 +1,5 @@
 name: Bug report
-description: Something's wrong with llmeter
+description: Something's wrong with tokenly
 labels: ["bug"]
 body:
   - type: markdown
@@ -12,7 +12,7 @@ body:
     attributes:
       label: What happened?
       description: What did you expect, and what did you get instead?
-      placeholder: I called openai.chat.completions.create and llmeter logged 0 tokens
+      placeholder: I called openai.chat.completions.create and tokenly logged 0 tokens
     validations:
       required: true
 
@@ -23,8 +23,8 @@ body:
       description: Smallest code snippet that triggers the bug.
       render: python
       placeholder: |
-        import llmeter, openai
-        llmeter.init()
+        import tokenly, openai
+        tokenly.init()
         openai.OpenAI().chat.completions.create(...)
     validations:
       required: true
@@ -32,10 +32,10 @@ body:
   - type: textarea
     id: doctor
     attributes:
-      label: Output of `llmeter doctor`
+      label: Output of `tokenly doctor`
       render: shell
       placeholder: |
-        $ llmeter doctor
+        $ tokenly doctor
         ...
     validations:
       required: true
@@ -49,9 +49,9 @@ body:
       required: true
 
   - type: input
-    id: llmeter-version
+    id: tokenly-version
     attributes:
-      label: llmeter version
+      label: tokenly version
       placeholder: "0.1.0"
     validations:
       required: true

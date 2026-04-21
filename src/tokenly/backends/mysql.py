@@ -1,4 +1,4 @@
-"""MySQL / MariaDB backend. Requires `pip install llmeter[mysql]`."""
+"""MySQL / MariaDB backend. Requires `pip install tokenly[mysql]`."""
 from __future__ import annotations
 
 from urllib.parse import unquote, urlparse
@@ -15,13 +15,13 @@ class MysqlBackend(Backend):
             import pymysql
         except ImportError as e:
             raise RuntimeError(
-                "llmeter: MySQL backend requires pymysql. "
-                "Install with `pip install llmeter[mysql]`."
+                "tokenly: MySQL backend requires pymysql. "
+                "Install with `pip install tokenly[mysql]`."
             ) from e
 
         u = urlparse(self.url)
         if not u.hostname:
-            raise ValueError(f"llmeter: invalid mysql url {self.url!r}")
+            raise ValueError(f"tokenly: invalid mysql url {self.url!r}")
         kwargs = dict(
             host=u.hostname,
             port=u.port or 3306,

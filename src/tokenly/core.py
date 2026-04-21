@@ -15,7 +15,7 @@ from typing import Any
 from .backends import Backend, get_backend, resolve_url
 from .pricing import compute_cost, is_known
 
-log = logging.getLogger("llmeter")
+log = logging.getLogger("tokenly")
 
 
 class BudgetExceeded(RuntimeError):
@@ -51,7 +51,7 @@ def _writer_loop(url: str) -> None:
             try:
                 backend.write_row(row)
             except Exception as e:
-                log.warning("llmeter: failed to write call: %s", e)
+                log.warning("tokenly: failed to write call: %s", e)
     finally:
         if backend is not None:
             backend.close()
@@ -63,7 +63,7 @@ def _start_writer() -> None:
         return
     _stop_event.clear()
     _writer_thread = threading.Thread(
-        target=_writer_loop, args=(_config.db_url,), name="llmeter-writer", daemon=True
+        target=_writer_loop, args=(_config.db_url,), name="tokenly-writer", daemon=True
     )
     _writer_thread.start()
 
@@ -102,8 +102,8 @@ def track(
 
     if not is_known(provider, model):
         log.warning(
-            "llmeter: unknown model %s/%s — logged with $0 cost. "
-            "PR pricing at https://github.com/deependra04/llmeter",
+            "tokenly: unknown model %s/%s — logged with $0 cost. "
+            "PR pricing at https://github.com/deependra04/tokenly",
             provider,
             model,
         )
@@ -137,7 +137,7 @@ def track(
         spent = _today_spend_usd() + cost
         if spent >= _config.warn_usd_day:
             print(
-                f"llmeter: daily spend ${spent:.2f} passed warn threshold "
+                f"tokenly: daily spend ${spent:.2f} passed warn threshold "
                 f"${_config.warn_usd_day:.2f}",
                 file=sys.stderr,
             )
@@ -152,27 +152,27 @@ def configure(
     warn_usd_day: float | None = None,
     tags: dict[str, Any] | None = None,
 ) -> None:
-    """Configure llmeter without initializing patches.
+    """Configure tokenly without initializing patches.
 
     Priority for storage location:
         1. db_url kwarg   (e.g. "postgresql://user:pass@host/db")
         2. db_path kwarg  (legacy, sqlite only — wrapped into sqlite://)
-        3. LLMETER_DB_URL env
-        4. LLMETER_DB env (legacy)
-        5. default ~/.llmeter/log.db
+        3. TOKENLY_DB_URL env
+        4. TOKENLY_DB env (legacy)
+        5. default ~/.tokenly/log.db
     """
     resolved = resolve_url(db_url=db_url, db_path=db_path)
     _config.db_url = resolved
 
     if budget_usd_day is not None:
         _config.budget_usd_day = float(budget_usd_day)
-    elif os.environ.get("LLMETER_DAILY_BUDGET"):
-        _config.budget_usd_day = float(os.environ["LLMETER_DAILY_BUDGET"])
+    elif os.environ.get("TOKENLY_DAILY_BUDGET"):
+        _config.budget_usd_day = float(os.environ["TOKENLY_DAILY_BUDGET"])
 
     if warn_usd_day is not None:
         _config.warn_usd_day = float(warn_usd_day)
-    elif os.environ.get("LLMETER_DAILY_WARN"):
-        _config.warn_usd_day = float(os.environ["LLMETER_DAILY_WARN"])
+    elif os.environ.get("TOKENLY_DAILY_WARN"):
+        _config.warn_usd_day = float(os.environ["TOKENLY_DAILY_WARN"])
 
     if tags is not None:
         _config.tags = dict(tags)
@@ -185,13 +185,13 @@ def init(
     warn_usd_day: float | None = None,
     tags: dict[str, Any] | None = None,
 ) -> None:
-    """Initialize llmeter. Call once at app startup.
+    """Initialize tokenly. Call once at app startup.
 
     Detects installed provider SDKs and patches them.
 
     Storage is SQLite by default. Pass db_url to use MySQL or Postgres:
-        llmeter.init(db_url="mysql://user:pass@host/dbname")
-        llmeter.init(db_url="postgresql://user:pass@host/dbname")
+        tokenly.init(db_url="mysql://user:pass@host/dbname")
+        tokenly.init(db_url="postgresql://user:pass@host/dbname")
     """
     configure(
         db_url=db_url,
@@ -226,7 +226,7 @@ def init(
             p.patch()
             _config.patched.add("openai")
         except Exception as e:
-            log.warning("llmeter: failed to patch openai: %s", e)
+            log.warning("tokenly: failed to patch openai: %s", e)
 
     if _has_module("anthropic") and "anthropic" not in _config.patched:
         try:
@@ -235,7 +235,7 @@ def init(
             p.patch()
             _config.patched.add("anthropic")
         except Exception as e:
-            log.warning("llmeter: failed to patch anthropic: %s", e)
+            log.warning("tokenly: failed to patch anthropic: %s", e)
 
     if (
         _has_module("google.genai") or _has_module("google.generativeai")
@@ -246,4 +246,4 @@ def init(
             p.patch()
             _config.patched.add("google")
         except Exception as e:
-            log.warning("llmeter: failed to patch google: %s", e)
+            log.warning("tokenly: failed to patch google: %s", e)

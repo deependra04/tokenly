@@ -1,7 +1,7 @@
 """Tests for pricing.py — no network, no providers needed."""
 from __future__ import annotations
 
-from llmeter import pricing
+from tokenly import pricing
 
 
 def test_known_model_cost_openai():

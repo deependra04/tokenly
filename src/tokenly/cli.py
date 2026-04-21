@@ -1,4 +1,4 @@
-"""llmeter CLI: stats, tail, export, reset, doctor."""
+"""tokenly CLI: stats, tail, export, reset, doctor."""
 from __future__ import annotations
 
 import argparse
@@ -45,7 +45,7 @@ def cmd_stats(args) -> int:
     try:
         backend = _open_backend()
     except Exception as e:
-        print(f"llmeter: {e}", file=sys.stderr)
+        print(f"tokenly: {e}", file=sys.stderr)
         return 1
 
     try:
@@ -54,7 +54,7 @@ def cmd_stats(args) -> int:
         calls, in_tok, out_tok, cr_tok, cw_tok, total_cost, avg_lat = totals
 
         print()
-        print(f"  llmeter · {label}")
+        print(f"  tokenly · {label}")
         print("  " + "─" * 52)
         print(f"  Spend       {_fmt_usd(total_cost):>14}")
         print(f"  Calls       {_fmt_int(calls):>14}")
@@ -88,7 +88,7 @@ def cmd_stats(args) -> int:
 def cmd_tail(args) -> int:
     backend = _open_backend()
     last_id = backend.max_id()
-    print("llmeter: tailing calls (Ctrl-C to stop)")
+    print("tokenly: tailing calls (Ctrl-C to stop)")
     try:
         while True:
             rows = backend.tail_since(last_id)
@@ -145,7 +145,7 @@ def cmd_reset(args) -> int:
                 print("aborted.")
                 return 1
         backend.reset()
-        print(f"llmeter: reset {backend.name}")
+        print(f"tokenly: reset {backend.name}")
     finally:
         backend.close()
     return 0
@@ -156,7 +156,7 @@ def cmd_doctor(args) -> int:
 
     url = resolve_url()
     print()
-    print("  llmeter · doctor")
+    print("  tokenly · doctor")
     print("  " + "─" * 52)
     print(f"  version:  {__version__}")
     print(f"  db url:   {url}")
@@ -196,10 +196,10 @@ def cmd_doctor(args) -> int:
         print(f"    {name:<22} {mark}")
     print()
     for var in [
-        "LLMETER_DB_URL",
-        "LLMETER_DB",
-        "LLMETER_DAILY_BUDGET",
-        "LLMETER_DAILY_WARN",
+        "TOKENLY_DB_URL",
+        "TOKENLY_DB",
+        "TOKENLY_DAILY_BUDGET",
+        "TOKENLY_DAILY_WARN",
     ]:
         val = os.environ.get(var, "(unset)")
         print(f"  {var:<22} {val}")
@@ -208,8 +208,8 @@ def cmd_doctor(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="llmeter", description="Track AI API costs.")
-    p.add_argument("--version", action="version", version=f"llmeter {__version__}")
+    p = argparse.ArgumentParser(prog="tokenly", description="Track AI API costs.")
+    p.add_argument("--version", action="version", version=f"tokenly {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("stats", help="show spend summary")

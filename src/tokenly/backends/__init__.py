@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .base import Backend
 
-_DEFAULT_SQLITE = Path.home() / ".llmeter" / "log.db"
+_DEFAULT_SQLITE = Path.home() / ".tokenly" / "log.db"
 
 
 def resolve_url(
@@ -16,12 +16,12 @@ def resolve_url(
     """Figure out which backend URL to use, honoring legacy env vars."""
     if db_url:
         return db_url
-    env_url = os.environ.get("LLMETER_DB_URL")
+    env_url = os.environ.get("TOKENLY_DB_URL")
     if env_url:
         return env_url
     if db_path is not None:
         return f"sqlite:///{Path(db_path).expanduser()}"
-    legacy = os.environ.get("LLMETER_DB")
+    legacy = os.environ.get("TOKENLY_DB")
     if legacy:
         return f"sqlite:///{Path(legacy).expanduser()}"
     return f"sqlite:///{_DEFAULT_SQLITE}"
@@ -43,7 +43,7 @@ def get_backend(url: str) -> Backend:
 
         return PostgresBackend(url)
     raise ValueError(
-        f"llmeter: unsupported db scheme '{scheme}'. "
+        f"tokenly: unsupported db scheme '{scheme}'. "
         f"Use sqlite://, mysql://, or postgresql://"
     )
 

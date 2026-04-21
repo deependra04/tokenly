@@ -1,11 +1,11 @@
 name: Feature request
-description: Suggest an idea for llmeter
+description: Suggest an idea for tokenly
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        llmeter tries to stay small, zero-dep, and local-first. Please keep that in mind.
+        tokenly tries to stay small, zero-dep, and local-first. Please keep that in mind.
         If you're proposing a gateway / proxy / routing feature, it's almost certainly out of scope — see LiteLLM or Portkey instead.
 
   - type: textarea
@@ -22,7 +22,7 @@ body:
       label: Proposed solution
       description: What would the API / CLI / output look like?
       placeholder: |
-        llmeter stats --by=tag.feature --show-cache-savings
+        tokenly stats --by=tag.feature --show-cache-savings
     validations:
       required: true
 

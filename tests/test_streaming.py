@@ -21,11 +21,11 @@ def _fake_stream_chunks():
 
 
 def test_stream_tracker_records_on_end(tmp_path, monkeypatch):
-    from llmeter import configure, init
-    from llmeter.backends import get_backend
-    from llmeter.providers.openai import _StreamTracker
+    from tokenly import configure, init
+    from tokenly.backends import get_backend
+    from tokenly.providers.openai import _StreamTracker
 
-    monkeypatch.delenv("LLMETER_DB_URL", raising=False)
+    monkeypatch.delenv("TOKENLY_DB_URL", raising=False)
     configure(db_url=f"sqlite:///{tmp_path}/log.db")
     init(db_url=f"sqlite:///{tmp_path}/log.db")
 
@@ -58,8 +58,8 @@ def test_stream_tracker_records_on_end(tmp_path, monkeypatch):
 
 
 def test_stream_tracker_close_idempotent(tmp_path, monkeypatch):
-    from llmeter import init
-    from llmeter.providers.openai import _StreamTracker
+    from tokenly import init
+    from tokenly.providers.openai import _StreamTracker
 
     init(db_url=f"sqlite:///{tmp_path}/log.db")
 

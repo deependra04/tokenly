@@ -7,7 +7,7 @@ from typing import Any
 
 from ..core import track
 
-log = logging.getLogger("llmeter.anthropic")
+log = logging.getLogger("tokenly.anthropic")
 
 
 def _get(obj, name, default=0):
@@ -123,7 +123,7 @@ class _StreamTracker:
                 **self._totals,
             )
         except Exception as e:
-            log.warning("llmeter: anthropic stream tracking failed: %s", e)
+            log.warning("tokenly: anthropic stream tracking failed: %s", e)
 
 
 class _AsyncStreamTracker(_StreamTracker):
@@ -160,13 +160,13 @@ def patch() -> None:
     try:
         from anthropic.resources import messages as _m
     except Exception as e:
-        log.warning("llmeter: anthropic SDK shape unrecognized: %s", e)
+        log.warning("tokenly: anthropic SDK shape unrecognized: %s", e)
         return
 
     sync_cls = getattr(_m, "Messages", None)
     async_cls = getattr(_m, "AsyncMessages", None)
 
-    if sync_cls and not getattr(sync_cls.create, "__llmeter_patched__", False):
+    if sync_cls and not getattr(sync_cls.create, "__tokenly_patched__", False):
         original = sync_cls.create
 
         def wrapped(self, *args, **kwargs):
@@ -186,13 +186,13 @@ def patch() -> None:
                         **usage,
                     )
             except Exception as e:
-                log.warning("llmeter: anthropic tracking failed: %s", e)
+                log.warning("tokenly: anthropic tracking failed: %s", e)
             return response
 
-        wrapped.__llmeter_patched__ = True
+        wrapped.__tokenly_patched__ = True
         sync_cls.create = wrapped
 
-    if async_cls and not getattr(async_cls.create, "__llmeter_patched__", False):
+    if async_cls and not getattr(async_cls.create, "__tokenly_patched__", False):
         original_async = async_cls.create
 
         async def wrapped_async(self, *args, **kwargs):
@@ -212,8 +212,8 @@ def patch() -> None:
                         **usage,
                     )
             except Exception as e:
-                log.warning("llmeter: anthropic async tracking failed: %s", e)
+                log.warning("tokenly: anthropic async tracking failed: %s", e)
             return response
 
-        wrapped_async.__llmeter_patched__ = True
+        wrapped_async.__tokenly_patched__ = True
         async_cls.create = wrapped_async

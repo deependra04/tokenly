@@ -1,4 +1,4 @@
-"""PostgreSQL backend. Requires `pip install llmeter[postgres]`."""
+"""PostgreSQL backend. Requires `pip install tokenly[postgres]`."""
 from __future__ import annotations
 
 from urllib.parse import urlparse
@@ -15,8 +15,8 @@ class PostgresBackend(Backend):
             import psycopg  # type: ignore
         except ImportError as e:
             raise RuntimeError(
-                "llmeter: Postgres backend requires psycopg. "
-                "Install with `pip install llmeter[postgres]`."
+                "tokenly: Postgres backend requires psycopg. "
+                "Install with `pip install tokenly[postgres]`."
             ) from e
 
         # psycopg accepts postgresql:// URLs directly.

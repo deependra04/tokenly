@@ -7,7 +7,7 @@ from typing import Any
 
 from ..core import track
 
-log = logging.getLogger("llmeter.google")
+log = logging.getLogger("tokenly.google")
 
 
 def _extract_usage(response: Any) -> dict[str, int]:
@@ -60,13 +60,13 @@ def patch() -> None:
             _patch_legacy_genai(genai)
             return
         except Exception as e:
-            log.warning("llmeter: google SDK shape unrecognized: %s", e)
+            log.warning("tokenly: google SDK shape unrecognized: %s", e)
             return
 
     target = getattr(_m, "Models", None)
     async_target = getattr(_m, "AsyncModels", None)
 
-    if target and not getattr(target.generate_content, "__llmeter_patched__", False):
+    if target and not getattr(target.generate_content, "__tokenly_patched__", False):
         original = target.generate_content
 
         def wrapped(self, *args, **kwargs):
@@ -83,13 +83,13 @@ def patch() -> None:
                         **usage,
                     )
             except Exception as e:
-                log.warning("llmeter: google tracking failed: %s", e)
+                log.warning("tokenly: google tracking failed: %s", e)
             return response
 
-        wrapped.__llmeter_patched__ = True
+        wrapped.__tokenly_patched__ = True
         target.generate_content = wrapped
 
-    if async_target and not getattr(async_target.generate_content, "__llmeter_patched__", False):
+    if async_target and not getattr(async_target.generate_content, "__tokenly_patched__", False):
         original_async = async_target.generate_content
 
         async def wrapped_async(self, *args, **kwargs):
@@ -106,10 +106,10 @@ def patch() -> None:
                         **usage,
                     )
             except Exception as e:
-                log.warning("llmeter: google async tracking failed: %s", e)
+                log.warning("tokenly: google async tracking failed: %s", e)
             return response
 
-        wrapped_async.__llmeter_patched__ = True
+        wrapped_async.__tokenly_patched__ = True
         async_target.generate_content = wrapped_async
 
 
@@ -118,7 +118,7 @@ def _patch_legacy_genai(genai: Any) -> None:
     model_cls = getattr(genai, "GenerativeModel", None)
     if not model_cls:
         return
-    if getattr(model_cls.generate_content, "__llmeter_patched__", False):
+    if getattr(model_cls.generate_content, "__tokenly_patched__", False):
         return
 
     original = model_cls.generate_content
@@ -138,8 +138,8 @@ def _patch_legacy_genai(genai: Any) -> None:
                     **usage,
                 )
         except Exception as e:
-            log.warning("llmeter: google legacy tracking failed: %s", e)
+            log.warning("tokenly: google legacy tracking failed: %s", e)
         return response
 
-    wrapped.__llmeter_patched__ = True
+    wrapped.__tokenly_patched__ = True
     model_cls.generate_content = wrapped

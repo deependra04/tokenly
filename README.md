@@ -1,23 +1,23 @@
-# llmeter
+# tokenly
 
-[![CI](https://github.com/deependra04/llmeter/actions/workflows/ci.yml/badge.svg)](https://github.com/deependra04/llmeter/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/llmeter/)
+[![CI](https://github.com/deependra04/tokenly/actions/workflows/ci.yml/badge.svg)](https://github.com/deependra04/tokenly/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/tokenly/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.0-orange)](https://github.com/deependra04/llmeter/releases)
+[![Version](https://img.shields.io/badge/version-0.1.0-orange)](https://github.com/deependra04/tokenly/releases)
 
 > One line to track every AI API cost. Sentry for AI costs. No proxy, no account, free forever.
 
 ```python
-import llmeter
-llmeter.init()
+import tokenly
+tokenly.init()
 ```
 
 That's it. Now every OpenAI / Anthropic / Google call you make is logged — tokens, cost, latency, cache hits — to a local SQLite file.
 
 ```
-$ llmeter stats
+$ tokenly stats
 
-  llmeter · Today
+  tokenly · Today
   ────────────────────────────────────────────────────
   Spend                    $4.21
   Calls                       89
@@ -32,12 +32,12 @@ $ llmeter stats
 - Your monthly AI bill came back at $847 and you have no idea which feature caused it.
 - Your bill swings 2-3× every quarter for no reason you can explain.
 - Every existing tool wants you to change your base URL, run a proxy, or create an account.
-- llmeter is a *tracker*, not a gateway. One line, zero config, local first.
+- tokenly is a *tracker*, not a gateway. One line, zero config, local first.
 
 ## Install
 
 ```bash
-pip install llmeter
+pip install tokenly
 ```
 
 Python 3.10+. Zero runtime dependencies.
@@ -45,8 +45,8 @@ Python 3.10+. Zero runtime dependencies.
 ## Use it
 
 ```python
-import llmeter
-llmeter.init()
+import tokenly
+tokenly.init()
 
 import openai
 client = openai.OpenAI()
@@ -59,39 +59,39 @@ client.chat.completions.create(
 Then any time:
 
 ```bash
-llmeter stats              # today
-llmeter stats --week       # last 7 days
-llmeter stats --month      # this month
-llmeter stats --by=model   # group by model
-llmeter tail               # live stream
-llmeter export > calls.csv
-llmeter doctor             # diagnose setup
+tokenly stats              # today
+tokenly stats --week       # last 7 days
+tokenly stats --month      # this month
+tokenly stats --by=model   # group by model
+tokenly tail               # live stream
+tokenly export > calls.csv
+tokenly doctor             # diagnose setup
 ```
 
 ## Tag calls by user / feature
 
 ```python
-llmeter.configure(tags={"user": "alice", "feature": "chat"})
+tokenly.configure(tags={"user": "alice", "feature": "chat"})
 ```
 
 Then:
 
 ```bash
-llmeter stats --by=tag.user
-llmeter stats --by=tag.feature
+tokenly stats --by=tag.user
+tokenly stats --by=tag.feature
 ```
 
 ## Budget alerts
 
 ```bash
-export LLMETER_DAILY_BUDGET=10   # raise BudgetExceeded when spend hits $10/day
-export LLMETER_DAILY_WARN=5      # warn at $5/day, keep going
+export TOKENLY_DAILY_BUDGET=10   # raise BudgetExceeded when spend hits $10/day
+export TOKENLY_DAILY_WARN=5      # warn at $5/day, keep going
 ```
 
 Or in code:
 
 ```python
-llmeter.init(budget_usd_day=10, warn_usd_day=5)
+tokenly.init(budget_usd_day=10, warn_usd_day=5)
 ```
 
 ## Works with
@@ -103,34 +103,34 @@ llmeter.init(budget_usd_day=10, warn_usd_day=5)
 | Google Gemini | prompt / output tokens, cached content tokens, cost |
 | DeepSeek, xAI, Mistral, Cohere | via pricing DB; patches coming |
 
-Because llmeter patches the underlying SDKs, **LangChain, LlamaIndex, and any other framework built on these SDKs work automatically** — no integration needed.
+Because tokenly patches the underlying SDKs, **LangChain, LlamaIndex, and any other framework built on these SDKs work automatically** — no integration needed.
 
 ## Where is the data?
 
-By default: `~/.llmeter/log.db` — a single SQLite file. One table, ten columns. Move it, query it, back it up, delete it. It's yours.
+By default: `~/.tokenly/log.db` — a single SQLite file. One table, ten columns. Move it, query it, back it up, delete it. It's yours.
 
 ### Pick any backend
 
-SQLite is the default and needs nothing. For a team setup, point llmeter at your own MySQL or Postgres:
+SQLite is the default and needs nothing. For a team setup, point tokenly at your own MySQL or Postgres:
 
 ```bash
 # One of these:
-export LLMETER_DB_URL="sqlite:///~/.llmeter/log.db"                 # default
-export LLMETER_DB_URL="mysql://user:pass@host:3306/llmeter"         # pip install llmeter[mysql]
-export LLMETER_DB_URL="postgresql://user:pass@host:5432/llmeter"    # pip install llmeter[postgres]
+export TOKENLY_DB_URL="sqlite:///~/.tokenly/log.db"                 # default
+export TOKENLY_DB_URL="mysql://user:pass@host:3306/tokenly"         # pip install tokenly[mysql]
+export TOKENLY_DB_URL="postgresql://user:pass@host:5432/tokenly"    # pip install tokenly[postgres]
 ```
 
 Or in code:
 
 ```python
-llmeter.init(db_url="postgresql://user:pass@db.internal/llmeter")
+tokenly.init(db_url="postgresql://user:pass@db.internal/tokenly")
 ```
 
-The schema is created automatically on first connect. The legacy `LLMETER_DB=/path/to.db` env var still works (treated as a SQLite path).
+The schema is created automatically on first connect. The legacy `TOKENLY_DB=/path/to.db` env var still works (treated as a SQLite path).
 
 ## vs other tools
 
-| | llmeter | LiteLLM | Helicone | Langfuse |
+| | tokenly | LiteLLM | Helicone | Langfuse |
 |---|---|---|---|---|
 | One-line setup | ✓ | ✗ | ✗ | ✗ |
 | Requires URL change | ✗ | ✓ | ✓ | ✗ |
@@ -140,7 +140,7 @@ The schema is created automatically on first connect. The legacy `LLMETER_DB=/pa
 | Pure cost tracking | ✓ | ~ | ~ | ~ |
 | Zero runtime deps | ✓ | ✗ | ✗ | ✗ |
 
-llmeter is tracking-only by design. If you want routing, fallbacks, or an auth proxy, use LiteLLM or Portkey. If you just want to know what you're spending, use llmeter.
+tokenly is tracking-only by design. If you want routing, fallbacks, or an auth proxy, use LiteLLM or Portkey. If you just want to know what you're spending, use tokenly.
 
 ## Roadmap
 
@@ -149,8 +149,8 @@ llmeter is tracking-only by design. If you want routing, fallbacks, or an auth p
 - [x] Tags and budget alerts
 - [x] Streaming-response support (OpenAI, Anthropic)
 - [x] Multi-DB backend: SQLite (default), MySQL, Postgres
-- [ ] Local web dashboard (`llmeter dashboard`)
-- [ ] OpenTelemetry GenAI export (`pip install llmeter[otel]`)
+- [ ] Local web dashboard (`tokenly dashboard`)
+- [ ] OpenTelemetry GenAI export (`pip install tokenly[otel]`)
 - [ ] Node / TypeScript SDK (same storage)
 - [ ] Weekly auto-updated pricing DB
 
@@ -158,4 +158,4 @@ llmeter is tracking-only by design. If you want routing, fallbacks, or an auth p
 
 MIT © 2026 Deependra Vishwakarma.
 
-Pricing numbers are best-effort; verify with the provider before basing decisions on them. Unknown models log with $0 cost; please PR them in `src/llmeter/pricing.json`.
+Pricing numbers are best-effort; verify with the provider before basing decisions on them. Unknown models log with $0 cost; please PR them in `src/tokenly/pricing.json`.

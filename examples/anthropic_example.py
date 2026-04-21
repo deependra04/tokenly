@@ -1,8 +1,8 @@
-"""Run: pip install anthropic llmeter && python examples/anthropic_example.py"""
+"""Run: pip install anthropic tokenly && python examples/anthropic_example.py"""
 import anthropic
-import llmeter
+import tokenly
 
-llmeter.init()
+tokenly.init()
 
 client = anthropic.Anthropic()
 resp = client.messages.create(
@@ -11,4 +11,4 @@ resp = client.messages.create(
     messages=[{"role": "user", "content": "Say hi in 3 words."}],
 )
 print(resp.content[0].text)
-print("→ Run `llmeter stats` to see the cost.")
+print("→ Run `tokenly stats` to see the cost.")

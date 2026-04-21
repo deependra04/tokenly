@@ -7,7 +7,7 @@ from typing import Any
 
 from ..core import track
 
-log = logging.getLogger("llmeter.openai")
+log = logging.getLogger("tokenly.openai")
 
 
 def _extract_usage(response_or_chunk: Any) -> dict[str, int]:
@@ -111,7 +111,7 @@ class _StreamTracker:
                     **usage,
                 )
         except Exception as e:
-            log.warning("llmeter: openai stream tracking failed: %s", e)
+            log.warning("tokenly: openai stream tracking failed: %s", e)
 
 
 class _AsyncStreamTracker:
@@ -168,7 +168,7 @@ class _AsyncStreamTracker:
                     **usage,
                 )
         except Exception as e:
-            log.warning("llmeter: openai async stream tracking failed: %s", e)
+            log.warning("tokenly: openai async stream tracking failed: %s", e)
 
 
 def patch() -> None:
@@ -176,13 +176,13 @@ def patch() -> None:
     try:
         from openai.resources.chat import completions as _cc
     except Exception as e:
-        log.warning("llmeter: openai SDK shape unrecognized: %s", e)
+        log.warning("tokenly: openai SDK shape unrecognized: %s", e)
         return
 
     sync_cls = getattr(_cc, "Completions", None)
     async_cls = getattr(_cc, "AsyncCompletions", None)
 
-    if sync_cls and not getattr(sync_cls.create, "__llmeter_patched__", False):
+    if sync_cls and not getattr(sync_cls.create, "__tokenly_patched__", False):
         original = sync_cls.create
 
         def wrapped(self, *args, **kwargs):
@@ -204,13 +204,13 @@ def patch() -> None:
                         **usage,
                     )
             except Exception as e:
-                log.warning("llmeter: openai tracking failed: %s", e)
+                log.warning("tokenly: openai tracking failed: %s", e)
             return response
 
-        wrapped.__llmeter_patched__ = True
+        wrapped.__tokenly_patched__ = True
         sync_cls.create = wrapped
 
-    if async_cls and not getattr(async_cls.create, "__llmeter_patched__", False):
+    if async_cls and not getattr(async_cls.create, "__tokenly_patched__", False):
         original_async = async_cls.create
 
         async def wrapped_async(self, *args, **kwargs):
@@ -232,8 +232,8 @@ def patch() -> None:
                         **usage,
                     )
             except Exception as e:
-                log.warning("llmeter: openai async tracking failed: %s", e)
+                log.warning("tokenly: openai async tracking failed: %s", e)
             return response
 
-        wrapped_async.__llmeter_patched__ = True
+        wrapped_async.__tokenly_patched__ = True
         async_cls.create = wrapped_async

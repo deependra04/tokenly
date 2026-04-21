@@ -26,7 +26,7 @@ _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 def _safe_tag_key(key: str) -> str:
     """Reject non-identifier tag keys to keep SQL injection off the table."""
     if not _IDENT.match(key):
-        raise ValueError(f"llmeter: unsafe tag key {key!r}")
+        raise ValueError(f"tokenly: unsafe tag key {key!r}")
     return key
 
 

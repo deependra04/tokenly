@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-import llmeter
-from llmeter import core
+import tokenly
+from tokenly import core
 
 
 @pytest.fixture
@@ -16,7 +16,7 @@ def tmp_db(tmp_path, monkeypatch):
     db = tmp_path / "log.db"
     core._config = core.Config()
     core._write_queue.queue.clear() if hasattr(core._write_queue, "queue") else None
-    monkeypatch.setenv("LLMETER_DB", str(db))
+    monkeypatch.setenv("TOKENLY_DB", str(db))
     core.init(db_path=db)
     yield db
     core._stop_event.set()
@@ -87,8 +87,8 @@ def test_init_is_idempotent(tmp_db):
 
 
 def test_module_api_exports():
-    assert hasattr(llmeter, "init")
-    assert hasattr(llmeter, "track")
-    assert hasattr(llmeter, "configure")
-    assert hasattr(llmeter, "BudgetExceeded")
-    assert hasattr(llmeter, "__version__")
+    assert hasattr(tokenly, "init")
+    assert hasattr(tokenly, "track")
+    assert hasattr(tokenly, "configure")
+    assert hasattr(tokenly, "BudgetExceeded")
+    assert hasattr(tokenly, "__version__")
