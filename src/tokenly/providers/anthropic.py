@@ -108,6 +108,14 @@ class _StreamTracker:
         finally:
             self._record()
 
+    def __del__(self):
+        # Fire once even if the consumer breaks out of the iterator / lets
+        # it be garbage-collected without calling __exit__ or close().
+        try:
+            self._record()
+        except Exception:
+            pass
+
     def _record(self):
         if self._recorded:
             return

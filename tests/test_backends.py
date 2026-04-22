@@ -174,3 +174,71 @@ def test_real_mysql_backend_if_available():
         assert b.totals(since_ts=None)[0] >= 1
     finally:
         b.close()
+
+
+def _row(i: int, cost: float = 0.001) -> tuple:
+    return (
+        time.time(),
+        "openai",
+        "gpt-4o-mini",
+        100 + i,
+        50,
+        0,
+        0,
+        cost,
+        100,
+        json.dumps({"i": i}),
+    )
+
+
+def test_sqlite_write_rows_batch(tmp_path):
+    """New in v0.2.2: batched insert path reduces commit count on hot paths."""
+    url = f"sqlite:///{tmp_path}/log.db"
+    b = get_backend(url)
+    try:
+        rows = [_row(i) for i in range(50)]
+        b.write_rows(rows)
+        calls, in_tok, out_tok, _, _, cost, _ = b.totals(since_ts=None)
+        assert calls == 50
+        assert in_tok == sum(100 + i for i in range(50))
+        assert out_tok == 50 * 50
+        assert cost == pytest.approx(0.05)
+    finally:
+        b.close()
+
+
+def test_sqlite_write_rows_empty_is_noop(tmp_path):
+    url = f"sqlite:///{tmp_path}/log.db"
+    b = get_backend(url)
+    try:
+        b.write_rows([])
+        assert b.totals(since_ts=None)[0] == 0
+    finally:
+        b.close()
+
+
+def test_sqlite_single_and_batch_produce_same_result(tmp_path):
+    """Parity: feeding the same rows via write_row x N and write_rows once
+    yields equivalent persisted state."""
+    url_a = f"sqlite:///{tmp_path}/a.db"
+    url_b = f"sqlite:///{tmp_path}/b.db"
+    rows = [_row(i, cost=0.0001 * (i + 1)) for i in range(20)]
+
+    a = get_backend(url_a)
+    try:
+        for r in rows:
+            a.write_row(r)
+        totals_a = a.totals(since_ts=None)
+    finally:
+        a.close()
+
+    b = get_backend(url_b)
+    try:
+        b.write_rows(rows)
+        totals_b = b.totals(since_ts=None)
+    finally:
+        b.close()
+
+    # Compare call count, token sums, cache sums, total cost — skip avg_lat
+    # (floating rounding between paths is not meaningful for this check).
+    assert totals_a[:6] == pytest.approx(totals_b[:6])

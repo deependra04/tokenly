@@ -28,7 +28,23 @@ class SqliteBackend(Backend):
         p.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(p), check_same_thread=False)
         conn.execute("PRAGMA journal_mode=WAL")
+        # Keep the WAL file from growing unbounded: auto-checkpoint after
+        # 1000 pages (~4 MB at default page size). Zero means no auto.
+        conn.execute("PRAGMA wal_autocheckpoint=1000")
+        conn.execute("PRAGMA synchronous=NORMAL")
         return conn
+
+    def _is_transient(self, exc: BaseException) -> bool:
+        if isinstance(exc, sqlite3.OperationalError):
+            msg = str(exc).lower()
+            return any(
+                s in msg
+                for s in ("database is locked", "disk i/o error", "no such table")
+            )
+        if isinstance(exc, sqlite3.ProgrammingError):
+            # Most common trigger: cursor on a closed connection.
+            return "closed" in str(exc).lower()
+        return False
 
     def _ddl(self) -> list[str]:
         return [

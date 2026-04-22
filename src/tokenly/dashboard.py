@@ -170,6 +170,29 @@ class _Handler(BaseHTTPRequestHandler):
         window = q.get("window", "today")
         since = _since_ts(window)
         bucket = _bucket_for(window)
+        # Explicit overrides are clamped to sane ranges — blocks `?bucket=0`
+        # (SQL division by zero) and `?bucket=-1` / `?since=abc`.
+        if "bucket" in q:
+            try:
+                bucket = int(q["bucket"])
+            except (TypeError, ValueError):
+                self._send_json({"error": "bucket must be an integer"}, status=400)
+                return
+            if bucket < 60 or bucket > 86_400:
+                self._send_json(
+                    {"error": "bucket must be between 60 and 86400 seconds"},
+                    status=400,
+                )
+                return
+        if "since" in q:
+            try:
+                since = float(q["since"])
+            except (TypeError, ValueError):
+                self._send_json({"error": "since must be a number"}, status=400)
+                return
+            if since < 0:
+                self._send_json({"error": "since must be >= 0"}, status=400)
+                return
         try:
             series = self.backend.time_series(since, bucket)
         except Exception as e:
@@ -187,10 +210,17 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _api_recent(self) -> None:
         q = self._query()
+        raw = q.get("limit", "50")
         try:
-            limit = max(1, min(int(q.get("limit", "50")), 500))
-        except ValueError:
-            limit = 50
+            limit = int(raw)
+        except (TypeError, ValueError):
+            self._send_json({"error": "limit must be an integer"}, status=400)
+            return
+        if limit < 1 or limit > 1000:
+            self._send_json(
+                {"error": "limit must be between 1 and 1000"}, status=400
+            )
+            return
         rows = self.backend.recent_calls(limit=limit)
         self._send_json(
             {
@@ -257,11 +287,19 @@ def serve(
         threading.Timer(0.4, lambda: webbrowser.open(url)).start()
     try:
         server.serve_forever()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         print("\n  stopping…")
     finally:
-        server.shutdown()
-        server.server_close()
+        # Both calls can raise OSError if the socket is already torn down
+        # (e.g. a second SIGINT). We just want to exit cleanly.
+        try:
+            server.shutdown()
+        except OSError:
+            pass
+        try:
+            server.server_close()
+        except OSError:
+            pass
 
 
 # ── embedded HTML ────────────────────────────────────────────────────

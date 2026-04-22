@@ -88,3 +88,69 @@ def test_stream_tracker_close_idempotent(tmp_path, monkeypatch):
     assert tracker._recorded is True
 
 
+def test_stream_tracker_records_on_early_break(tmp_path):
+    """User breaks out of the stream before it ends — usage is still logged."""
+    import tokenly
+    from tokenly import init
+    from tokenly.providers.openai import _StreamTracker
+
+    init(db_url=f"sqlite:///{tmp_path}/log.db")
+
+    tracker = _StreamTracker(
+        iter(_fake_stream_chunks()),
+        kwargs={"model": "gpt-4o-mini"},
+        start=time.perf_counter(),
+    )
+    for chunk in tracker:
+        if getattr(chunk, "usage", None) is not None:
+            # Simulate a user bailing out early once they see usage info.
+            break
+
+    # Trackers record at generator-end. Forcing close flushes the pending
+    # record — the same path __del__ uses during garbage collection.
+    tracker.close()
+    tokenly.flush(timeout=2.0)
+
+    from tokenly.backends import get_backend
+    b = get_backend(f"sqlite:///{tmp_path}/log.db")
+    try:
+        calls = b.totals(since_ts=None)[0]
+    finally:
+        b.close()
+    assert calls == 1
+
+
+def test_stream_tracker_del_fallback_records(tmp_path):
+    """If the caller never calls close() and the tracker is GC'd, __del__
+    must still fire the final record."""
+    import gc
+
+    import tokenly
+    from tokenly import init
+    from tokenly.providers.openai import _StreamTracker
+
+    init(db_url=f"sqlite:///{tmp_path}/log.db")
+
+    def _leak():
+        t = _StreamTracker(
+            iter(_fake_stream_chunks()),
+            kwargs={"model": "gpt-4o-mini"},
+            start=time.perf_counter(),
+        )
+        # Drain so _totals is populated.
+        list(t)
+        # t goes out of scope here — __del__ runs during GC.
+
+    _leak()
+    gc.collect()
+    tokenly.flush(timeout=2.0)
+
+    from tokenly.backends import get_backend
+    b = get_backend(f"sqlite:///{tmp_path}/log.db")
+    try:
+        calls = b.totals(since_ts=None)[0]
+    finally:
+        b.close()
+    assert calls >= 1
+
+

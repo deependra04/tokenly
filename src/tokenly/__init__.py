@@ -7,7 +7,14 @@ Then use OpenAI / Anthropic / Google SDKs normally. Run `tokenly stats` to see c
 """
 from __future__ import annotations
 
-from .core import BudgetExceeded, configure, init, track
+from .core import BudgetExceeded, configure, flush, init, track
 
-__version__ = "0.2.0"
-__all__ = ["init", "track", "configure", "BudgetExceeded", "__version__"]
+__version__ = "0.2.2"
+__all__ = [
+    "init",
+    "track",
+    "configure",
+    "flush",
+    "BudgetExceeded",
+    "__version__",
+]

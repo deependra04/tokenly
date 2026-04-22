@@ -50,6 +50,17 @@ class PostgresBackend(Backend):
     def tag_expr(self, key: str) -> str:
         return f"(tags::jsonb->>'{key}')"
 
+    def _is_transient(self, exc: BaseException) -> bool:
+        try:
+            import psycopg  # type: ignore
+        except ImportError:
+            return False
+        # OperationalError covers "server closed the connection unexpectedly"
+        # and similar; InterfaceError covers "connection already closed".
+        return isinstance(
+            exc, (psycopg.OperationalError, psycopg.InterfaceError)
+        )
+
     def describe(self) -> str:
         u = urlparse(self.url)
         return f"postgres: {u.hostname}:{u.port or 5432}/{u.path.lstrip('/')}"

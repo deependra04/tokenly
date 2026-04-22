@@ -1,18 +1,39 @@
-"""Pricing lookup and cost calculation."""
+"""Pricing lookup and cost calculation.
+
+The pricing table is loaded once and re-read only when the file's mtime
+changes — lets the weekly `sync_pricing.py` script update prices without a
+process restart.
+"""
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
+log = logging.getLogger("tokenly.pricing")
+
 _PRICING_FILE = Path(__file__).parent / "pricing.json"
+
 _cache: dict | None = None
+_cache_mtime: float | None = None
+
+_warned_unknown: set[tuple[str, str]] = set()
 
 
 def _load() -> dict:
-    global _cache
-    if _cache is None:
+    """Load pricing.json, reloading automatically if the file has changed."""
+    global _cache, _cache_mtime
+    try:
+        mtime = _PRICING_FILE.stat().st_mtime
+    except OSError as e:
+        if _cache is not None:
+            return _cache
+        raise RuntimeError(f"tokenly: cannot read pricing.json: {e}") from e
+
+    if _cache is None or _cache_mtime != mtime:
         with _PRICING_FILE.open() as f:
             _cache = json.load(f)
+        _cache_mtime = mtime
     return _cache
 
 
@@ -39,9 +60,22 @@ def compute_cost(
     cache_read_tokens: int = 0,
     cache_write_tokens: int = 0,
 ) -> float:
-    """Compute USD cost for a call. Returns 0.0 for unknown models."""
+    """Compute USD cost for a call. Returns 0.0 for unknown models.
+
+    Unknown (provider, model) pairs log a one-time warning so the user sees
+    it in their logs without spamming every call.
+    """
     rates = get_rates(provider, model)
     if rates is None:
+        key = (provider, model)
+        if key not in _warned_unknown:
+            _warned_unknown.add(key)
+            log.warning(
+                "tokenly: no pricing for %s/%s — logging with $0 cost. "
+                "PR it in src/tokenly/pricing.json.",
+                provider,
+                model,
+            )
         return 0.0
 
     input_price = rates["input"]

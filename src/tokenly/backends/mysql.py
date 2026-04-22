@@ -59,6 +59,18 @@ class MysqlBackend(Backend):
         # JSON_UNQUOTE so grouping key is a plain string, not '"value"'.
         return f"JSON_UNQUOTE(JSON_EXTRACT(tags, '$.{key}'))"
 
+    def _is_transient(self, exc: BaseException) -> bool:
+        # pymysql error numbers: 2006 server gone, 2013 lost connection,
+        # 2014 commands out of sync. Inspect via .args[0] when available.
+        try:
+            import pymysql
+        except ImportError:
+            return False
+        if isinstance(exc, (pymysql.err.OperationalError, pymysql.err.InterfaceError)):
+            code = exc.args[0] if exc.args else None
+            return code in (2006, 2013, 2014, 0)
+        return False
+
     def describe(self) -> str:
         u = urlparse(self.url)
         return f"mysql: {u.hostname}:{u.port or 3306}/{u.path.lstrip('/')}"

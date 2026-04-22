@@ -67,6 +67,20 @@ class Backend:
             self._init_schema()
         return self._conn
 
+    def _is_transient(self, exc: BaseException) -> bool:
+        """Subclass hook. Return True if `exc` looks like a stale/closed
+        connection that a single reconnect would fix."""
+        return False
+
+    def _reset_conn(self) -> None:
+        """Force the next `self.conn` access to open a new connection."""
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
+
     def _init_schema(self) -> None:
         cur = self._conn.cursor()
         try:
@@ -116,14 +130,45 @@ class Backend:
         return ", ".join([self.ph] * n)
 
     # ── writes ────────────────────────────────────────────────────────
-    def write_row(self, row: tuple) -> None:
-        sql = (
+    def _insert_sql(self) -> str:
+        return (
             f"INSERT INTO calls ({', '.join(_COLS)}) "
             f"VALUES ({self._ph_list(len(_COLS))})"
         )
-        with self._cursor() as cur:
-            cur.execute(sql, tuple(row))
-        self.conn.commit()
+
+    def write_row(self, row: tuple) -> None:
+        sql = self._insert_sql()
+        self._exec_with_retry(sql, tuple(row), many=False)
+
+    def write_rows(self, rows: list[tuple]) -> None:
+        """Insert many rows in a single transaction (one commit).
+
+        Provided by the base class using `executemany`. Subclasses rarely
+        need to override this; they just need their driver to support it.
+        """
+        if not rows:
+            return
+        sql = self._insert_sql()
+        self._exec_with_retry(sql, [tuple(r) for r in rows], many=True)
+
+    def _exec_with_retry(self, sql: str, params: Any, *, many: bool) -> None:
+        """Run INSERT … with one reconnect on transient connection errors."""
+        attempts = 0
+        while True:
+            try:
+                with self._cursor() as cur:
+                    if many:
+                        cur.executemany(sql, params)
+                    else:
+                        cur.execute(sql, params)
+                self.conn.commit()
+                return
+            except Exception as e:
+                if attempts == 0 and self._is_transient(e):
+                    attempts += 1
+                    self._reset_conn()
+                    continue
+                raise
 
     # ── reads ─────────────────────────────────────────────────────────
     def totals(self, since_ts: float | None) -> tuple:

@@ -96,6 +96,14 @@ class _StreamTracker:
         finally:
             self._record()
 
+    def __del__(self):
+        # Catch the case where the caller breaks out of the iterator or
+        # lets it be GC'd without ever calling __exit__/close.
+        try:
+            self._record()
+        except Exception:
+            pass
+
     def _record(self):
         if self._recorded:
             return
@@ -152,6 +160,12 @@ class _AsyncStreamTracker:
             await self._stream.close()
         finally:
             self._record()
+
+    def __del__(self):
+        try:
+            self._record()
+        except Exception:
+            pass
 
     def _record(self):
         if self._recorded:

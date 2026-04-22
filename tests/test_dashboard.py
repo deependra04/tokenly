@@ -124,3 +124,36 @@ def test_unknown_path_404(live_server):
     with pytest.raises(urllib.error.HTTPError) as ei:
         urllib.request.urlopen(live_server + "/api/does-not-exist", timeout=3)
     assert ei.value.code == 404
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/timeseries?bucket=0",
+        "/api/timeseries?bucket=-1",
+        "/api/timeseries?bucket=abc",
+        "/api/timeseries?bucket=999999",
+        "/api/timeseries?since=abc",
+        "/api/timeseries?since=-5",
+        "/api/recent?limit=0",
+        "/api/recent?limit=-5",
+        "/api/recent?limit=abc",
+        "/api/recent?limit=99999999",
+    ],
+)
+def test_query_param_validation_returns_400(live_server, path):
+    with pytest.raises(urllib.error.HTTPError) as ei:
+        urllib.request.urlopen(live_server + path, timeout=3)
+    assert ei.value.code == 400
+    body = json.loads(ei.value.read())
+    assert "error" in body
+
+
+def test_recent_limit_within_range_ok(live_server):
+    data = _get(live_server, "/api/recent?limit=1")
+    assert len(data["rows"]) == 1
+
+
+def test_timeseries_bucket_explicit_ok(live_server):
+    data = _get(live_server, "/api/timeseries?window=all&bucket=60")
+    assert data["bucket_seconds"] == 60

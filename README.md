@@ -3,7 +3,7 @@
 [![CI](https://github.com/deependra04/tokenly/actions/workflows/ci.yml/badge.svg)](https://github.com/deependra04/tokenly/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/tokenly/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.0-orange)](https://github.com/deependra04/tokenly/releases)
+[![Version](https://img.shields.io/badge/version-0.2.2-orange)](https://github.com/deependra04/tokenly/releases)
 
 > One line to track every AI API cost. Sentry for AI costs. No proxy, no account, free forever.
 
@@ -152,6 +152,45 @@ tokenly dashboard
 Boots a local, read-only web dashboard on `http://127.0.0.1:8787` (auto-picks a free port if that's taken) and opens your browser. Spend cards, cost-by-model bars, cost-over-time line chart, and a live table of recent calls. Tabs for Today / Week / Month / All. Refreshes every 5 seconds.
 
 Stdlib HTTP server, no JS framework, Chart.js via CDN. Stays zero-dep. Pass `--no-open` for headless, `--host 0.0.0.0` to expose on your LAN (no auth — only do this on trusted networks).
+
+### Dashboard security
+
+- Binds `127.0.0.1` by default — reachable only from the same machine.
+- `--host 0.0.0.0` (or `::`) prints a yellow warning at startup: no authentication, read-only, and reachable by anyone on your network. Run it behind a reverse proxy with auth before exposing it publicly.
+- Query params are validated: `/api/timeseries?bucket=` must be a positive int between 60 and 86 400 seconds; `/api/recent?limit=` must be in `[1, 1000]`. Bad input → HTTP 400 with a JSON error, no crashes, no resource exhaustion.
+- Tag keys in `/api/by-tag?key=...` are sanitized against an identifier allowlist so SQL injection is off the table.
+
+## Concurrency & shutdown
+
+- `tokenly.init()` is **thread-safe and idempotent.** Call it from any thread, any number of times — a module-level lock prevents duplicate writer threads or re-patched SDKs. If the configured DB URL changes across calls the writer restarts against the new URL.
+- **Writes never block your API call.** Every tracked row goes into a bounded in-memory queue (`maxsize=10 000`) drained by a background thread. Past the queue limit, new rows are dropped with a rate-limited warning — the caller still returns normally.
+- **Shutdown is handled for you.** An `atexit` hook flushes the queue and joins the writer with a 5 s timeout. Rows in flight at interpreter exit are persisted cleanly.
+- For workers about to be **SIGKILLed** (container teardown, cron timeout), call `tokenly.flush(timeout=5.0)` explicitly to force a drain + commit before you exit.
+
+```python
+import tokenly
+tokenly.init()
+...
+tokenly.flush()   # block until everything is on disk
+```
+
+## Production notes
+
+- **Batched writes.** The writer coalesces up to 100 rows (or 500 ms) into one transaction — 1 000 calls turn into ~10 commits, not 1 000. Trades ≤500 ms of observability latency for dramatically lower disk I/O.
+- **Budget check is O(1).** Daily budget / warn thresholds are tracked in an in-memory counter seeded from the DB at startup and reset on UTC day rollover. No per-call SQL query.
+- **Pricing auto-reloads.** Tokenly compares `pricing.json` mtime on every lookup; the weekly `sync_pricing.py` cron doesn't need a process restart.
+- **SQLite WAL.** Default backend runs in WAL mode with `wal_autocheckpoint=1000` and `synchronous=NORMAL`. Back up with `sqlite3 ~/.tokenly/log.db ".backup /path/to/backup.db"` — safe while the process is writing.
+- **Tested Python versions.** 3.10, 3.11, 3.12, 3.13. CI matrix runs the full test suite on all four.
+- **Zero deps on the default path.** The SQLite + OpenAI/Anthropic/Google install is stdlib only. MySQL / Postgres / OTel are opt-in extras.
+- **Overhead per call.** Measured at ~35 µs on the hot path (token clamp + cost lookup + queue put), well under 0.1 % of even a 20 ms model call.
+
+## Troubleshooting
+
+- **`tokenly doctor`** — one-shot diagnostic: tokenly version, resolved DB URL *(password-masked)*, backend connect status, which provider SDKs are installed, which optional DB drivers are available, and the values of the `TOKENLY_*` env vars. Start here for any setup issue.
+- **"no pricing for foo/bar" warning** — that model isn't in `pricing.json` yet. The call is still logged at `$0`; open a PR with the rate.
+- **Dashboard port already in use** — tokenly auto-falls back to the next free port starting from `8787` and prints the chosen URL. Pass `--port N` to pin one explicitly.
+- **Switching DB URLs** — just call `tokenly.init(db_url="...")` again. The writer restarts cleanly against the new backend. Nothing in the old DB moves; both files remain on disk.
+- **Logs leaking passwords?** They shouldn't. `doctor`, `configure()`, and internal warnings all mask DB passwords via `urllib.parse`. If you see an unmasked URL in our output, please file an issue.
 
 ## vs other tools
 

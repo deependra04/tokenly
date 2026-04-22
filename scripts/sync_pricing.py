@@ -8,11 +8,20 @@ proposed pricing.json + markdown summary.
 
 Runs weekly via .github/workflows/pricing-sync.yml. Stdlib only.
 
-Usage (local): `python scripts/sync_pricing.py`
-Exit code 0 always. Diff is reflected in the filesystem if any.
+Usage:
+    python scripts/sync_pricing.py                   # real run
+    python scripts/sync_pricing.py --dry-run         # don't write anything
+    python scripts/sync_pricing.py --fixture foo.json  # use local file, not HTTP
+
+Exit codes:
+    0  sync succeeded (with or without changes).
+    1  structural error: feed root is not a JSON object, or the feed is
+       unreachable *and* we were given a fixture we can't read. A single
+       bad entry inside an otherwise-good feed is skipped, not fatal.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import urllib.request
@@ -40,8 +49,17 @@ PROVIDER_ALIASES = {
     "cohere": "cohere",
 }
 
+# Hard sanity limits. Providers don't publish rates outside this window in
+# practice; seeing $5001/1M means the feed is wrong, and we'd rather keep
+# stale but correct pricing than adopt a bogus number.
+_MIN_PRICE = 0.0
+_MAX_PRICE = 5000.0
+_ALLOWED_FIELDS = {"input", "output", "cache_read", "cache_write"}
 
-def fetch_feed() -> dict:
+
+def fetch_feed(fixture: Path | None) -> dict:
+    if fixture is not None:
+        return json.loads(fixture.read_text())
     req = urllib.request.Request(
         FEED_URL, headers={"User-Agent": "tokenly-pricing-sync/1.0"}
     )
@@ -71,21 +89,55 @@ def normalize_key(litellm_key: str, litellm_entry: dict) -> str | None:
         "gemini/",
     ):
         if model.startswith(prefix):
-            model = model[len(prefix) :]
+            model = model[len(prefix):]
     return f"{alias}/{model}"
 
 
-def main() -> int:
-    try:
-        feed = fetch_feed()
-    except Exception as e:
-        print(f"sync_pricing: failed to fetch feed: {e}", file=sys.stderr)
-        return 0
+def _validate_price(field: str, value: object) -> float | None:
+    """Return a clean float price, or raise ValueError with a clear message.
 
-    current: dict = json.loads(PRICING_PATH.read_text())
+    None passes through unchanged for optional cache_* fields.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{field} must be a number, got {type(value).__name__}")
+    v = float(value)
+    if v != v:  # NaN
+        raise ValueError(f"{field} is NaN")
+    if v < _MIN_PRICE:
+        raise ValueError(f"{field} is negative ({v})")
+    if v > _MAX_PRICE:
+        raise ValueError(
+            f"{field} is suspiciously large ({v} USD/1M tokens); "
+            f"capping sync at {_MAX_PRICE}"
+        )
+    return v
 
-    # Build a lookup from the feed in our normalized key format. Later entries win.
+
+def _validate_entry(key: str, entry: dict) -> dict:
+    """Validate + normalize a proposed pricing entry. Raises ValueError
+    with the key name prefixed for log clarity."""
+    extra = set(entry) - _ALLOWED_FIELDS
+    if extra:
+        raise ValueError(f"{key}: unknown fields {sorted(extra)}")
+    clean: dict[str, float | None] = {}
+    for field in ("input", "output"):
+        if entry.get(field) is None:
+            raise ValueError(f"{key}: required field {field} missing")
+        clean[field] = _validate_price(field, entry[field])
+    for field in ("cache_read", "cache_write"):
+        clean[field] = _validate_price(field, entry.get(field))
+    return clean
+
+
+def build_feed_prices(feed: dict) -> tuple[dict[str, dict], list[str]]:
+    """Walk the upstream feed and return (normalized_prices, skipped_warnings).
+
+    Entries with missing/bad fields are skipped with a warning, not fatal.
+    """
     feed_prices: dict[str, dict] = {}
+    skipped: list[str] = []
     for key, entry in feed.items():
         if not isinstance(entry, dict):
             continue
@@ -98,17 +150,54 @@ def main() -> int:
             entry.get("cache_read_input_token_cost")
             or entry.get("input_cost_per_token_cache_hit")
         )
-        cache_write = to_per_million(
-            entry.get("cache_creation_input_token_cost")
-        )
-        if inp is None or out is None:
-            continue
-        feed_prices[norm] = {
+        cache_write = to_per_million(entry.get("cache_creation_input_token_cost"))
+        proposed = {
             "input": inp,
             "output": out,
             "cache_read": cache_read,
             "cache_write": cache_write,
         }
+        try:
+            feed_prices[norm] = _validate_entry(norm, proposed)
+        except ValueError as e:
+            skipped.append(str(e))
+    return feed_prices, skipped
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Sync tokenly pricing.json.")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="don't modify pricing.json or write the summary",
+    )
+    parser.add_argument(
+        "--fixture",
+        type=Path,
+        default=None,
+        help="read feed from a local JSON file instead of HTTP",
+    )
+    args = parser.parse_args(argv)
+
+    try:
+        feed = fetch_feed(args.fixture)
+    except Exception as e:
+        if args.fixture is not None:
+            print(f"sync_pricing: cannot read fixture: {e}", file=sys.stderr)
+            return 1
+        # Network hiccup from cron: don't fail noisily, just skip.
+        print(f"sync_pricing: failed to fetch feed: {e}", file=sys.stderr)
+        return 0
+
+    if not isinstance(feed, dict):
+        print("sync_pricing: feed root is not a JSON object", file=sys.stderr)
+        return 1
+
+    feed_prices, skipped = build_feed_prices(feed)
+    for s in skipped:
+        print(f"sync_pricing: skip {s}", file=sys.stderr)
+
+    current: dict = json.loads(PRICING_PATH.read_text())
 
     changes: list[str] = []
     updated = dict(current)
@@ -133,8 +222,14 @@ def main() -> int:
 
     if not changes:
         print("sync_pricing: no pricing changes detected.")
-        if SUMMARY_PATH.exists():
+        if not args.dry_run and SUMMARY_PATH.exists():
             SUMMARY_PATH.unlink()
+        return 0
+
+    if args.dry_run:
+        print(f"sync_pricing: (dry-run) would update {len(changes)} model(s):")
+        for line in changes:
+            print(f"  {line}")
         return 0
 
     PRICING_PATH.write_text(json.dumps(updated, indent=2) + "\n")

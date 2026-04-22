@@ -14,6 +14,7 @@ from .backends.base import (
     start_of_day_epoch,
     start_of_month_epoch,
 )
+from .core import _mask_url
 
 
 def _open_backend():
@@ -154,6 +155,17 @@ def cmd_reset(args) -> int:
 def cmd_dashboard(args) -> int:
     from .dashboard import serve
 
+    if args.host in ("0.0.0.0", "::"):
+        # ANSI yellow — graceful if the terminal doesn't render it.
+        print(
+            "\033[33m"
+            "  ⚠  dashboard bound to "
+            f"{args.host} — no authentication. Read-only, but "
+            "anyone on the network can see your spend data.\n"
+            "     Use only on trusted networks."
+            "\033[0m",
+            file=sys.stderr,
+        )
     serve(
         host=args.host,
         port=args.port,
@@ -170,7 +182,7 @@ def cmd_doctor(args) -> int:
     print("  tokenly · doctor")
     print("  " + "─" * 52)
     print(f"  version:  {__version__}")
-    print(f"  db url:   {url}")
+    print(f"  db url:   {_mask_url(url)}")
     try:
         backend = get_backend(url)
         try:
@@ -213,6 +225,8 @@ def cmd_doctor(args) -> int:
         "TOKENLY_DAILY_WARN",
     ]:
         val = os.environ.get(var, "(unset)")
+        if var == "TOKENLY_DB_URL" and val != "(unset)":
+            val = _mask_url(val)
         print(f"  {var:<22} {val}")
     print()
     return 0
